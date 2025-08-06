@@ -1,25 +1,52 @@
 package handlers
 
 import (
-    "net/http"
-    "github.com/gin-gonic/gin"
-    "ia-api/models"
-    "ia-api/services"
+	"net/http"
+	"github.com/gin-gonic/gin"
+	"ia-api/models"
+	"ia-api/services"
+	"ia-api/bd_sqlite"
+    "log"
 )
 
 func ChatHandler(c *gin.Context) {
-    var msg models.MessageRequest
+	var msg models.MessageRequest
 
-    if err := c.BindJSON(&msg); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Format JSON invalide"})
-        return
-    }
+	if err := c.BindJSON(&msg); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format JSON invalide"})
+		return
+	}
 
-    response, err := services.CallOpenRouter(msg.Messages, msg.Model)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	// 1. Enregistrer chaque message reçu
+	for _, m := range msg.Messages {
+		message := models.Message{
+			Content:        m.Content,
+			Role:           m.Role,
+			ConversationID: nil,
+			ParentID:       nil, // si tu veux gérer les forks plus tard
+		}
+		db.DB.Create(&message)
+        log.Printf("Message sauvegardé : %s (%s)", m.Content, m.Role)
+	}
 
-    c.JSON(http.StatusOK, gin.H{"response": response})
+    
+
+	// 2. Appeler l'IA avec tous les messages
+	response, err := services.CallOpenRouter(msg.Messages, msg.Model)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 3. Enregistrer la réponse IA
+	assistantMessage := models.Message{
+		Content:        response,
+		Role:           "assistant",
+		ConversationID: nil,
+	}
+    
+	db.DB.Create(&assistantMessage)
+    log.Printf("Réponse IA sauvegardée : %s", response)
+	// 4. Retourner la réponse
+	c.JSON(http.StatusOK, gin.H{"response": response})
 }

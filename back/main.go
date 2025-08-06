@@ -5,6 +5,8 @@ import (
     "ia-api/handlers"
     "github.com/joho/godotenv"
     "log"
+    "ia-api/bd_sqlite"
+    "ia-api/models"
 )
 
 func main() {
@@ -12,6 +14,10 @@ func main() {
     if err != nil {
         log.Fatal("Erreur chargement .env")
     }
+    db.Connect()
+
+    // Crée la table messages si elle n'existe pas
+    db.DB.AutoMigrate(&models.Message{})
 
     r := gin.Default()
 

@@ -1,11 +1,22 @@
 package models
 
+import "gorm.io/gorm"
+
 type ChatMessage struct {
-    Role    string `json:"role"`    // "user", "assistant", "system"
-    Content string `json:"content"` // le texte du message
+	Role    string `json:"role"`    // "user", "assistant", etc.
+	Content string `json:"content"`
 }
 
 type MessageRequest struct {
-    Messages []ChatMessage `json:"messages"`     // 👈 l'historique complet
-    Model    string        `json:"model"`        // facultatif
+	Messages       []ChatMessage `json:"messages"`
+	Model          string        `json:"model"`
+	ConversationID uint          `json:"conversation_id"` // pour regrouper
+}
+
+type Message struct {
+    gorm.Model
+    Content        string
+    Role           string
+    ConversationID *uint
+    ParentID       *uint
 }
