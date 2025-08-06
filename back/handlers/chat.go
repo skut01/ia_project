@@ -38,6 +38,7 @@ func ChatHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	var parentID *uint
 	if len(history) > 0 {
 		last := history[len(history)-1]
@@ -45,6 +46,15 @@ func ChatHandler(c *gin.Context) {
 	} else {
 		parentID = nil // premier message de la conversation
 	}
+
+	SaveToDB(req, response,parentID)
+
+
+	// 7. Retourner la réponse au client
+	c.JSON(http.StatusOK, gin.H{"response": response})
+}
+
+func SaveToDB(req models.MessageRequest, response string,parentID *uint) {
 	// 5. Sauvegarder le message utilisateur
 	userMsg := models.Message{
 		Content:        req.Message.Content,
@@ -52,21 +62,17 @@ func ChatHandler(c *gin.Context) {
 		ConversationID: &req.ConversationID,
 		ParentID:       parentID,
 	}
-	db.DB.Create(&userMsg)
 
+	db.DB.Create(&userMsg)
 
 	// 6. Sauvegarder la réponse assistant
 	assistantMsg := models.Message{
 		Content:        response,
 		Role:           "assistant",
 		ConversationID: &req.ConversationID,
-		ParentID:       &userMsg.ID, // réponse de l’IA = enfant du message user
+		ParentID:       &userMsg.ID, // réponse de l’IA = enfant
 	}
 	db.DB.Create(&assistantMsg)
-
-
-	// 7. Retourner la réponse au client
-	c.JSON(http.StatusOK, gin.H{"response": response})
 }
 
 /*Exemple de requête JSON a envoyer :{
