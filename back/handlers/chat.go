@@ -18,7 +18,7 @@ func ChatHandler(c *gin.Context) {
 
 	// 1. Récupérer l’historique depuis la DB
 	var history []models.Message
-	db.DB.Where("conversation_id = ?", req.ConversationID).Order("created_at asc").Find(&history)
+	db.DB.Where("conversation_id = ?", req.ConversationID).Order("id asc").Find(&history)
 
 	// 2. Convertir en []ChatMessage pour l’appel API
 	messages := make([]models.ChatMessage, len(history))
@@ -38,20 +38,32 @@ func ChatHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	var parentID *uint
+	if len(history) > 0 {
+		last := history[len(history)-1]
+		parentID = &last.ID
+	} else {
+		parentID = nil // premier message de la conversation
+	}
 	// 5. Sauvegarder le message utilisateur
-	db.DB.Create(&models.Message{
+	userMsg := models.Message{
 		Content:        req.Message.Content,
 		Role:           req.Message.Role,
 		ConversationID: &req.ConversationID,
-	})
+		ParentID:       parentID,
+	}
+	db.DB.Create(&userMsg)
+
 
 	// 6. Sauvegarder la réponse assistant
-	db.DB.Create(&models.Message{
+	assistantMsg := models.Message{
 		Content:        response,
 		Role:           "assistant",
 		ConversationID: &req.ConversationID,
-	})
+		ParentID:       &userMsg.ID, // réponse de l’IA = enfant du message user
+	}
+	db.DB.Create(&assistantMsg)
+
 
 	// 7. Retourner la réponse au client
 	c.JSON(http.StatusOK, gin.H{"response": response})
