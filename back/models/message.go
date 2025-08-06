@@ -18,5 +18,6 @@ type Message struct {
     Content        string
     Role           string
     ConversationID *uint
+    Conversation   Conversation `gorm:"foreignKey:ConversationID"`
     ParentID       *uint
 }

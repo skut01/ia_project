@@ -7,11 +7,12 @@ import (
 	"ia-api/services"
 	"ia-api/bd_sqlite"
     "log"
+	"ia-api/globals"
 )
 
 func ChatHandler(c *gin.Context) {
 	var msg models.MessageRequest
-
+	conv_id := &globals.DefaultConversation.ID
 	if err := c.BindJSON(&msg); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Format JSON invalide"})
 		return
@@ -22,7 +23,7 @@ func ChatHandler(c *gin.Context) {
 		message := models.Message{
 			Content:        m.Content,
 			Role:           m.Role,
-			ConversationID: nil,
+			ConversationID: conv_id,
 			ParentID:       nil, // si tu veux gérer les forks plus tard
 		}
 		db.DB.Create(&message)
@@ -42,7 +43,7 @@ func ChatHandler(c *gin.Context) {
 	assistantMessage := models.Message{
 		Content:        response,
 		Role:           "assistant",
-		ConversationID: nil,
+		ConversationID: conv_id,
 	}
     
 	db.DB.Create(&assistantMessage)
