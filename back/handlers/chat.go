@@ -6,48 +6,63 @@ import (
 	"ia-api/models"
 	"ia-api/services"
 	"ia-api/bd_sqlite"
-    "log"
-	"ia-api/globals"
 )
 
 func ChatHandler(c *gin.Context) {
-	var msg models.MessageRequest
-	conv_id := &globals.DefaultConversation.ID
-	if err := c.BindJSON(&msg); err != nil {
+	var req models.MessageRequest
+
+	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Format JSON invalide"})
 		return
 	}
 
-	// 1. Enregistrer chaque message reçu
-	for _, m := range msg.Messages {
-		message := models.Message{
-			Content:        m.Content,
-			Role:           m.Role,
-			ConversationID: conv_id,
-			ParentID:       nil, // si tu veux gérer les forks plus tard
+	// 1. Récupérer l’historique depuis la DB
+	var history []models.Message
+	db.DB.Where("conversation_id = ?", req.ConversationID).Order("created_at asc").Find(&history)
+
+	// 2. Convertir en []ChatMessage pour l’appel API
+	messages := make([]models.ChatMessage, len(history))
+	for i, m := range history {
+		messages[i] = models.ChatMessage{
+			Role:    m.Role,
+			Content: m.Content,
 		}
-		db.DB.Create(&message)
-        log.Printf("Message sauvegardé : %s (%s)", m.Content, m.Role)
 	}
 
-    
+	// 3. Ajouter le nouveau message reçu
+	messages = append(messages, req.Message)
 
-	// 2. Appeler l'IA avec tous les messages
-	response, err := services.CallOpenRouter(msg.Messages, msg.Model)
+	// 4. Appeler l’API LLM
+	response, err := services.CallOpenRouter(messages, req.Model)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 3. Enregistrer la réponse IA
-	assistantMessage := models.Message{
+	// 5. Sauvegarder le message utilisateur
+	db.DB.Create(&models.Message{
+		Content:        req.Message.Content,
+		Role:           req.Message.Role,
+		ConversationID: &req.ConversationID,
+	})
+
+	// 6. Sauvegarder la réponse assistant
+	db.DB.Create(&models.Message{
 		Content:        response,
 		Role:           "assistant",
-		ConversationID: conv_id,
-	}
-    
-	db.DB.Create(&assistantMessage)
-    log.Printf("Réponse IA sauvegardée : %s", response)
-	// 4. Retourner la réponse
+		ConversationID: &req.ConversationID,
+	})
+
+	// 7. Retourner la réponse au client
 	c.JSON(http.StatusOK, gin.H{"response": response})
 }
+
+/*Exemple de requête JSON a envoyer :{
+  "conversation_id": 1,
+  "model": "openrouter/horizon-beta",
+  "message": {
+    "role": "user",
+    "content": "quelle était ma derniere question ?"
+  }
+}
+  */

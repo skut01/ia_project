@@ -8,7 +8,7 @@ type ChatMessage struct {
 }
 
 type MessageRequest struct {
-	Messages       []ChatMessage `json:"messages"`
+	Message       ChatMessage `json:"message"`
 	Model          string        `json:"model"`
 	ConversationID uint          `json:"conversation_id"` // pour regrouper
 }
