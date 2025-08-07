@@ -16,7 +16,7 @@ const isThinking = ref(false)
 const messages = ref([])
 const loading = ref(true)
 const error = ref(null)
-const model = 'openrouter/horizon-beta'
+const model = 'openai/gpt-oss-20b:free'
 
 function scrollToBottom() {
   nextTick(() => {
